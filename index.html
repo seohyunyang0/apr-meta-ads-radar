@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APR 메타 광고 레이더</title>
+<meta name="description" content="메디큐브·에이프릴스킨이 Meta에서 돌리는 광고를 국가·운영일수·노출 순위로 보는 대시보드 (Meta 광고 라이브러리 공개 데이터)">
+<link rel="preload" href="fonts/Paperlogy-4Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  @font-face { font-family: "Paperlogy"; src: url("fonts/Paperlogy-4Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Paperlogy"; src: url("fonts/Paperlogy-6SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "Paperlogy"; src: url("fonts/Paperlogy-7Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+  /* Layout: one reading column of sections, summary → markets → efficiency → insights → full list */
+  :root {
+    --bg: #f6f6f3; --panel: #ffffff; --fg: #17181c; --muted: #62646c; --line: #e3e2dc; --soft: #efeee9;
+    --c0: #2546c9; --c1: #d9486f; --ok: #1f8a5b; --warn: #b7791f; --bad: #c2413b;
+    --font: "Paperlogy", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --radius: 10px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121317; --panel: #1b1c21; --fg: #ecebe6; --muted: #a2a3ab; --line: #2d2e35; --soft: #24252b;
+      --c0: #7d95ff; --c1: #ff7fa0; --ok: #5cc596; --warn: #e3b25a; --bad: #f07a72; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121317; --panel: #1b1c21; --fg: #ecebe6; --muted: #a2a3ab; --line: #2d2e35; --soft: #24252b;
+    --c0: #7d95ff; --c1: #ff7fa0; --ok: #5cc596; --warn: #e3b25a; --bad: #f07a72; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 48px; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+  h2 { font-size: 1.35rem; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+  p { margin: 0; }
+  a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--fg); }
+  :focus-visible { outline: 2px solid var(--c0); outline-offset: 2px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .head { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .lede { max-width: 72ch; font-size: 1.05rem; }
+  .lede b { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; position: sticky; top: 0; z-index: 20; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+  .filters label, .tools label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+  select, input[type=search] { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background-color: var(--panel); color: var(--fg); min-width: 0; max-width: 100%; }
+  select { min-width: 9rem; }
+  .btn { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background-color: var(--panel); color: var(--fg); cursor: pointer; }
+  .btn:hover { border-color: var(--muted); }
+  .btn[disabled] { opacity: .4; cursor: default; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .tile .big { font-size: 2rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+  section { display: flex; flex-direction: column; gap: 16px; }
+  section > header { display: flex; flex-direction: column; gap: 6px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .chart { position: relative; min-height: 260px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+  .chart .tick line { stroke: var(--line); }
+  .chart .domain { stroke: var(--line); }
+  .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0,0,0,.12); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.45; max-width: 270px; z-index: 5; }
+  .tip .k { color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .sw0 { background: var(--c0); } .sw1 { background: var(--c1); }
+
+  .scroll { overflow-x: auto; min-width: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.n, th.n { text-align: right; }
+  .heat td.n { min-width: 44px; }
+  .heat td.z { color: var(--muted); }
+  .heat td.clk { cursor: pointer; }
+  .bar-cell { position: relative; }
+  .bar-cell span.b { position: absolute; left: 0; top: 6px; bottom: 6px; background: color-mix(in srgb, var(--c0) 16%, transparent); border-radius: 3px; z-index: 0; }
+  .bar-cell span.t { position: relative; z-index: 1; }
+
+  .checks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; cursor: pointer; background: var(--panel); user-select: none; }
+  .chk input { accent-color: var(--c0); margin: 0; }
+  .chk:has(input:checked) { border-color: var(--c0); color: var(--c0); }
+  .cmp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+  .cmp-card h3 .cnt { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  .cmp-card h4 { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+
+  .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; align-self: flex-start; max-width: 100%; background: var(--panel); }
+  .tab { font: inherit; font-size: 13px; padding: 7px 16px; border: 0; border-radius: 7px; background-color: transparent; color: var(--muted); cursor: pointer; }
+  .tab[aria-selected="true"] { background-color: var(--fg); color: var(--bg); }
+
+  .top { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+  .ad { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  .ad .ph { aspect-ratio: 1 / 1; background: var(--soft); display: grid; place-items: center; color: var(--muted); font-size: 12px; max-width: 100%; }
+  .ad .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ad .bd { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .ad .txt { font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .chip.hot { color: var(--ok); border-color: var(--ok); }
+  .score { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; margin-top: auto; }
+
+  /* insights */
+  .ins { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 880px) { .ins { grid-template-columns: 1fr; } }
+  .ins .one { font-size: 1.1rem; font-weight: 700; line-height: 1.5; text-wrap: pretty; }
+  .ins ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 14px; }
+  .ins ol > li > b { font-weight: 700; }
+  .ins ul { margin: 6px 0 0; padding-left: 1.1em; list-style: "- "; color: var(--fg); }
+  .ins ul li { margin: 2px 0; }
+  .ins .why { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--c0); color: var(--muted); }
+  .ins .side { display: flex; flex-direction: column; gap: 16px; }
+  .ins .side ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .ins .side ul li { padding-left: 14px; position: relative; }
+  .ins .side ul li::before { content: ""; position: absolute; left: 0; top: .65em; width: 6px; height: 6px; border-radius: 50%; background: var(--c0); }
+  .ins .kpi li::before { background: var(--ok) !important; }
+  .topics td:first-child { font-weight: 600; white-space: nowrap; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  .tools input[type=search] { width: min(100%, 320px); }
+  .adtable td.ad-c { min-width: 280px; max-width: 420px; }
+  .cell-ad { display: flex; gap: 10px; align-items: flex-start; }
+  .cell-ad img, .cell-ad .noimg { width: 52px; height: 52px; border-radius: 6px; object-fit: cover; flex: none; background: var(--soft); }
+  .noimg { display: grid; place-items: center; font-size: 10px; color: var(--muted); border: 1px solid var(--line); }
+  .clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
+  td.lk { white-space: nowrap; } td.lk a { display: block; }
+  .pager { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  details { font-size: 13px; color: var(--muted); }
+  details summary { cursor: pointer; }
+  details ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.7; }
+  .note { font-size: 13px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 10px; }
+  footer { font-size: 12px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head" id="top">
+    <span class="eyebrow">META AD LIBRARY · 2026-11-21 수집</span>
+    <h1>APR 메타 광고 레이더</h1>
+    <p class="lede" id="lede">메디큐브·에이프릴스킨 공식 페이지 8곳의 활성 광고를 불러오는 중입니다.</p>
+    <p class="muted">활성 광고만 · CPC·ROAS는 비공개라 운영일수와 노출 순위로 효율을 대신 봅니다</p>
+  </header>
+
+  <div class="filters" role="group" aria-label="필터">
+    <label for="f-brand">브랜드
+      <select id="f-brand"><option value="">전체</option><option value="메디큐브">메디큐브</option><option value="에이프릴스킨">에이프릴스킨</option></select>
+    </label>
+    <label for="f-page">광고 페이지<select id="f-page"></select></label>
+    <label for="f-country">국가<select id="f-country"></select></label>
+    <label for="f-kind">광고 유형
+      <select id="f-kind"><option value="">전체</option><option value="브랜드 직접">브랜드 직접</option><option value="파트너십(크리에이터)">파트너십(크리에이터)</option></select>
+    </label>
+    <button type="button" class="btn" id="f-reset">필터 초기화</button>
+  </div>
+
+  <div class="tiles" aria-label="요약 지표">
+    <div class="tile"><span class="muted">활성 광고 수</span><span class="big" id="k-active">—</span><span class="muted">광고 라이브러리 집계 기준</span></div>
+    <div class="tile"><span class="muted">수집한 소재</span><span class="big" id="k-collected">—</span><span class="muted">노출 상위부터 수집</span></div>
+    <div class="tile"><span class="muted">운영일수 중앙값</span><span class="big" id="k-median">—</span><span class="muted">게재 시작일부터 수집일까지</span></div>
+    <div class="tile"><span class="muted">30일+ 장수 소재 비중</span><span class="big" id="k-long">—</span><span class="muted">오래 켜둔 소재 = 성과가 나는 소재로 간주</span></div>
+    <div class="tile"><span class="muted">파트너십 광고 비중</span><span class="big" id="k-partner">—</span><span class="muted">크리에이터 계정 명의로 집행</span></div>
+  </div>
+
+  <section id="by-country">
+    <header>
+      <h2>1. 나라별로 돌아가는 광고</h2>
+      <p class="muted">국가 필터를 걸고 광고 라이브러리가 집계한 활성 광고 수입니다. 막대나 표의 칸을 누르면 그 국가로 전체 화면이 걸러집니다.</p>
+    </header>
+    <div class="grid2">
+      <div class="card">
+        <h3>국가별 활성 광고 수</h3>
+        <div class="legend"><span><i class="sw0"></i>메디큐브</span><span><i class="sw1"></i>에이프릴스킨</span></div>
+        <div class="chart" id="country-bars" style="min-height:380px"></div>
+      </div>
+      <div class="card">
+        <h3>페이지 × 국가 매트릭스</h3>
+        <div class="scroll"><table class="heat"><thead id="heat-head"></thead><tbody id="heat-body"></tbody></table></div>
+        <p class="note">한 광고가 여러 국가에 동시에 나갈 수 있어서 국가별 합계는 활성 광고 수보다 큽니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="efficiency">
+    <header>
+      <h2>2. 운영일수와 콘텐츠 효율</h2>
+      <p class="muted">광고 라이브러리는 경쟁사의 CPC·ROAS를 공개하지 않습니다. 그래서 오래 켜둔 소재일수록, 같은 페이지 안에서 노출 순위가 높을수록 성과가 나고 있다는 뜻으로 봅니다.</p>
+    </header>
+    <div class="grid2">
+      <div class="card">
+        <h3>운영일수 분포</h3>
+        <div class="legend"><span><i class="sw0"></i>브랜드 직접</span><span><i class="sw1"></i>파트너십(크리에이터)</span></div>
+        <div class="chart" id="days-hist"></div>
+      </div>
+      <div class="card">
+        <h3>운영일수 × 노출 순위</h3>
+        <p class="muted">오른쪽 위로 갈수록 오래, 많이 노출된 소재입니다. 점 크기는 같은 소재로 만든 광고 수입니다.</p>
+        <div class="chart" id="scatter"></div>
+      </div>
+    </div>
+
+    <div class="card" id="cmp">
+      <h3>나라별 소재 형식 · 랜딩 채널 · 콘텐츠 주제 효율</h3>
+      <p class="muted">보고 싶은 나라를 체크하면 나라마다 따로 표가 나옵니다. "상위 20" 열은 그 나라 검색에서 노출 순위 20위 안에 든 소재 수입니다(전체는 페이지 노출 순위 50위 기준). 상단의 브랜드·페이지·광고 유형 필터가 함께 적용됩니다.</p>
+      <div class="checks" id="cmp-checks" role="group" aria-label="비교할 나라"></div>
+      <div class="cmp-grid" id="cmp-grid"></div>
+    </div>
+
+    <div class="card">
+      <h3>효율 지수 상위 소재 12</h3>
+      <p class="muted">효율 지수 = 운영일수 백분위 50점 + 페이지 안 노출 순위 백분위 50점 (0–100). 탭을 바꿔 파트너십 광고와 브랜드 자체 광고의 상위 12건을 따로 봅니다.</p>
+      <div class="tabs" role="tablist" aria-label="광고 명의">
+        <button type="button" role="tab" class="tab top-tab" data-kind="" aria-selected="true">전체</button>
+        <button type="button" role="tab" class="tab top-tab" data-kind="파트너십(크리에이터)" aria-selected="false">파트너십 광고</button>
+        <button type="button" role="tab" class="tab top-tab" data-kind="브랜드 직접" aria-selected="false">자체 광고</button>
+      </div>
+      <p class="muted" id="top-summary">—</p>
+      <div class="top" id="top-cards"></div>
+    </div>
+  </section>
+
+  <section id="insights">
+    <header>
+      <h2>3. 나라별 인사이트와 제안</h2>
+      <p class="muted">2026-11-21 수집 데이터로 쓴 회고입니다. 미국·영국·프랑스 광고는 모두 Medicube Global 페이지에서 나갑니다. 숫자는 각 나라 검색에서 노출 상위 약 180건 안에 잡힌 소재 기준입니다.</p>
+    </header>
+    <div class="tabs" role="tablist" aria-label="나라">
+      <button type="button" role="tab" class="tab ins-tab" data-c="US" aria-selected="true">미국</button>
+      <button type="button" role="tab" class="tab ins-tab" data-c="GB" aria-selected="false">영국</button>
+      <button type="button" role="tab" class="tab ins-tab" data-c="FR" aria-selected="false">프랑스</button>
+    </div>
+
+    <!-- 미국 -->
+    <div class="ins" data-ins="US">
+      <div class="card">
+        <span class="label">인사이트 · 미국 (소재 130건)</span>
+        <p class="one">부스터 프로 X2 크리에이터 언박싱을 Amazon으로 보내는 구조가 노출을 쥐고 있고, 블랙프라이데이 소재는 켜진 지 3일째라 아직 상위권 밖에 있음</p>
+        <ol>
+          <li><b>미국 노출 상위는 부스터 프로 X2 크리에이터 언박싱이 장악</b>
+            <ul>
+              <li>미국 노출 상위 12건 중 6건이 부스터 프로 X2(크리에이터 5건 + 브랜드 1건), 상위 20위 안에서는 10건</li>
+              <li>소재 130건 중 103건(79%)이 Amazon 랜딩, 상위 20위 중 17건도 Amazon</li>
+            </ul>
+            <p class="why">디바이스는 "처음 써본 반응"을 보여주는 크리에이터 첫 사용기가 노출을 가장 잘 받는 형식으로 보임. 신규 고객은 Amazon에서 사게 만드는 구조</p>
+          </li>
+          <li><b>오래 살아남는 건 '클리닉을 집에서' 메시지와 콜라겐 마스크</b>
+            <ul>
+              <li>"Achieve an expensive hydrafacial at home in just 5 minutes" 브랜드 영상이 398일째 운영 중(미국 노출 17위)</li>
+              <li>콜라겐 랩핑 마스크 소재는 운영일수 중앙값 78.5일, 30일+ 비중 75%(미국 전체 34일, 55%)</li>
+              <li>홈케어(클리닉 대체) 문구 소재 8건 중 75%가 30일+</li>
+            </ul>
+            <p class="why">신규 유입은 언박싱이 맡고, 상시로 켜두는 소재는 "비싼 관리를 집에서" 같은 가격 대비 메시지가 오래 버티는 것으로 보임</p>
+          </li>
+          <li><b>블랙프라이데이 소재는 아직 학습 구간</b>
+            <ul>
+              <li>세일·블랙프라이데이 문구 소재 20건, 운영일수 중앙값 3일, 미국 노출 순위 중앙값 94.5위, 상위 20위 0건</li>
+              <li>이미지 소재는 중앙값 3일로 대부분 세일용 신규 소재, 영상(34.5일)보다 짧음</li>
+              <li>자사몰(medicube.us) 랜딩 24건은 중앙값 58일로 오래 켜두지만 상위 20위는 2건</li>
+            </ul>
+            <p class="why">세일 이미지를 새로 켜서 처음부터 학습시키는 것보다, 이미 노출을 받는 언박싱 소재에 세일 메시지를 얹는 쪽이 11/27 전에 노출을 끌어올리기 빠를 것으로 보임</p>
+          </li>
+        </ol>
+      </div>
+      <div class="side">
+        <div class="card">
+          <span class="label">제안 · 내가 메디큐브 미국 담당이라면</span>
+          <ul>
+            <li><b>블프 주간:</b> 노출 상위 언박싱 크리에이터(Tqstaceyy, nataliehalcro, averykatherine) 소재를 파트너십 광고로 복제하고, 첫 3초 자막에 블랙프라이데이 가격을 넣어 Amazon 딜 페이지로 보냄</li>
+            <li><b>상시 소재:</b> 398일째 도는 "hydrafacial at home" 메시지를 크리에이터 버전으로 다시 만듦. 피부관리실 1회 비용과 기기 가격을 나란히 보여주는 구성</li>
+            <li><b>자사몰:</b> 블프에 Amazon으로 기기를 산 사람이 다시 올 이유를 만듦. 자사몰 전용 기기+콜라겐 마스크 세트를 리타겟팅 카탈로그 광고로 상시 운영</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="label">유의미한 전환 지표</span>
+          <ul class="kpi">
+            <li>Amazon 뷰티 디바이스 카테고리 판매 순위(블프 주간 일별)</li>
+            <li>Amazon Attribution 기준 크리에이터 소재별 장바구니 담기·ROAS</li>
+            <li>세일 소재의 미국 노출 상위 20위 진입 수(현재 0건)</li>
+            <li>medicube.us 신규 회원, 기기 구매 후 30일 안에 마스크·앰플 재구매율</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <span class="label">추천 콘텐츠 주제 · 미국</span>
+        <div class="scroll"><table class="topics">
+          <thead><tr><th>주제</th><th>이렇게 만들기</th><th>근거</th><th>레퍼런스</th></tr></thead>
+          <tbody>
+            <tr><td>부스터 프로 X2 첫 사용기</td><td>크리에이터가 상자를 열고 처음 써보는 장면, 마스크 모드 소리·진동 반응을 그대로</td><td>미국 상위 20위 중 10건</td><td><a href="https://www.facebook.com/ads/library/?id=1120602783706083" target="_blank" rel="noopener">1위 소재 ↗</a></td></tr>
+            <tr><td>비싼 관리를 집에서 5분</td><td>하이드라페이셜·피부관리실 1회 비용 vs 기기 1대, 5분 루틴 시연</td><td>398일 운영, 노출 17위</td><td><a href="https://www.facebook.com/ads/library/?id=798467206500886" target="_blank" rel="noopener">398일 소재 ↗</a></td></tr>
+            <tr><td>콜라겐 랩핑 마스크 나이트 루틴</td><td>자기 전 바르고 아침에 떼어내는 비포·애프터, 세럼 레이어링 "HACK" 형식</td><td>중앙값 78.5일, 30일+ 75%</td><td><a href="https://www.facebook.com/ads/library/?id=1358598193089178" target="_blank" rel="noopener">103일·6위 ↗</a></td></tr>
+            <tr><td>글래스 스킨 / 글레이즈드 도넛 피부</td><td>광채 결과를 먼저 보여주고 쓴 제품을 역순으로 공개</td><td>광채 문구 37건 중앙값 51일</td><td><a href="https://www.facebook.com/ads/library/?id=3718705438271185" target="_blank" rel="noopener">195일·7위 ↗</a></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- 영국 -->
+    <div class="ins" data-ins="GB" hidden>
+      <div class="card">
+        <span class="label">인사이트 · 영국 (소재 102건)</span>
+        <p class="one">영국은 소재 대부분이 파트너십 광고이고, 미국에서 잘 되는 디바이스보다 모공·콜라겐 마스크 같은 '바로 보이는 고민 해결' 소모품이 오래 감</p>
+        <ol>
+          <li><b>영국 소재의 89%가 파트너십 광고</b>
+            <ul>
+              <li>102건 중 91건이 크리에이터 명의, 노출 상위 20위권 22건 중 19건이 크리에이터</li>
+              <li>브랜드 자체 소재 11건은 운영일수 중앙값 9일로 크리에이터(32일)보다 훨씬 빨리 꺼짐</li>
+            </ul>
+            <p class="why">영국은 브랜드 명의 광고보다 크리에이터 리뷰 형식이 학습을 잘 타는 시장으로 보임</p>
+          </li>
+          <li><b>미국 1위 부스터 프로가 영국에선 약함, 대신 모공·콜라겐 마스크가 버팀</b>
+            <ul>
+              <li>부스터 프로 소재 17건: 중앙값 12일, 30일+ 18%, 상위 20위 0건</li>
+              <li>콜라겐 랩핑 마스크 27건: 중앙값 73일, 상위 20위 9건 / 모공·제로패드 17건: 30일+ 82%</li>
+              <li>영국 노출 1위는 "ZERO PORE BLACKHEAD MUD MASK" 크리에이터 영상(117일째)</li>
+            </ul>
+            <p class="why">영국에선 고가 디바이스보다 블랙헤드처럼 눈에 보이는 고민을 바로 해결하는 소모품이 진입 상품으로 맞는 것으로 보임</p>
+          </li>
+          <li><b>영국 노출 상위에 스페인어·중국어 소재가 섞여 있음</b>
+            <ul>
+              <li>스페인어 크리에이터 아이패치 영상 2·3위(167일째), 세럼 "HACK" 영상 4위</li>
+              <li>홍콩 페이지의 장기 소재 2건(Mannings 제휴, 비타C 앰플)이 영국 1·2위로 함께 잡힘</li>
+            </ul>
+            <p class="why">유럽을 묶어서 타겟하거나 다국어 소재를 함께 돌리는 것으로 추측. 같은 포맷을 영국 영어 크리에이터로 현지화하면 개선 여지가 있어 보임</p>
+          </li>
+        </ol>
+      </div>
+      <div class="side">
+        <div class="card">
+          <span class="label">제안 · 내가 메디큐브 영국 담당이라면</span>
+          <ul>
+            <li><b>진입 상품 교체:</b> 신규 고객 광고는 모공 머드마스크·콜라겐 랩핑 마스크로 시작하고, 부스터 프로는 이 소재로 들어온 사람에게 리타겟팅으로 보여줌</li>
+            <li><b>현지화:</b> 상위권 아이패치 루틴·세럼 HACK 포맷을 영국 영어 크리에이터로 다시 만들어 기존 스페인어 소재와 나란히 테스트</li>
+            <li><b>타겟 점검:</b> 홍콩 페이지 중국어 소재가 영국에 노출되는 세트를 확인하고 정리</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="label">유의미한 전환 지표</span>
+          <ul class="kpi">
+            <li>Amazon.co.uk 모공 마스크·콜라겐 마스크 판매 순위와 리뷰 수 증가</li>
+            <li>크리에이터 소재 30일 생존율(현재 57%)</li>
+            <li>마스크 구매자 중 90일 안에 부스터 프로를 산 비율</li>
+            <li>현지화 소재와 스페인어 소재의 CTR·장바구니 담기 비교</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <span class="label">추천 콘텐츠 주제 · 영국</span>
+        <div class="scroll"><table class="topics">
+          <thead><tr><th>주제</th><th>이렇게 만들기</th><th>근거</th><th>레퍼런스</th></tr></thead>
+          <tbody>
+            <tr><td>블랙헤드 머드마스크 "Pore wash day"</td><td>코 클로즈업 비포 → 바르고 씻어내는 장면 → 애프터, 주간 루틴처럼 반복 연재</td><td>영국 노출 1위, 모공 소재 30일+ 82%</td><td><a href="https://www.facebook.com/ads/library/?id=1748883259467665" target="_blank" rel="noopener">1위 소재 ↗</a></td></tr>
+            <tr><td>콜라겐 랩핑 마스크 오버나이트</td><td>밤에 바르고 아침에 벗기는 장면, "아침 광채" 결과 강조</td><td>27건 중앙값 73일, 상위 20위 9건</td><td><a href="https://www.facebook.com/ads/library/?id=1729053728309212" target="_blank" rel="noopener">110일·8위 ↗</a></td></tr>
+            <tr><td>아이패치 나이트 루틴</td><td>"이건 꼭 있어야 하는" 루틴 아이템 소개 형식, 영국 영어 크리에이터로 현지화</td><td>스페인어 원본 2·3위, 167일</td><td><a href="https://www.facebook.com/ads/library/?id=793858630478245" target="_blank" rel="noopener">167일·2위 ↗</a></td></tr>
+            <tr><td>PDRN 핑크 아이크림 듀오</td><td>눈가 주름·다크서클 고민을 짚고 아이크림 두 개를 함께 쓰는 법</td><td>66일째 영국 5위</td><td><a href="https://www.facebook.com/ads/library/?id=1736715214253801" target="_blank" rel="noopener">5위 소재 ↗</a></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- 프랑스 -->
+    <div class="ins" data-ins="FR" hidden>
+      <div class="card">
+        <span class="label">인사이트 · 프랑스 (소재 68건)</span>
+        <p class="one">프랑스는 Amazon.fr 블랙프라이데이 물량이 막 들어가 소재 대부분이 일주일도 안 됐고, 그 안에서 살아남은 건 '루틴'과 '통념 깨기' 크리에이터 영상</p>
+        <ol>
+          <li><b>소재 대부분이 켜진 지 일주일 미만</b>
+            <ul>
+              <li>68건 운영일수 중앙값 4일, 30일+ 19%(미국 55%, 영국 56%)</li>
+              <li>63건(93%)이 Amazon.fr 랜딩, 문구에 "Disponible sur Amazon France", "Black Friday… profitez"가 반복</li>
+            </ul>
+            <p class="why">프랑스는 Amazon.fr 판매 확대와 블프를 같이 밀고 있는 런칭 구간으로 보임</p>
+          </li>
+          <li><b>상위권은 전부 크리에이터, 브랜드 자체 소재는 상위 20위 0건</b>
+            <ul>
+              <li>노출 상위 20위 20건이 모두 파트너십 광고</li>
+              <li>브랜드 자체 소재 17건은 30일+ 0%, 이미지 12건도 중앙값 4일에 상위 20위 0건</li>
+            </ul>
+            <p class="why">프랑스에서 브랜드 명의 세일 이미지는 거의 학습을 못 타는 상태. 노출은 크리에이터 영상이 끌고 감</p>
+          </li>
+          <li><b>살아남는 건 루틴형·통념 깨기형 훅, 세일 문구는 버티지 못함</b>
+            <ul>
+              <li>루틴·사용법 문구 9건: 프랑스 노출 순위 중앙값 12위, 30일+ 44%</li>
+              <li>세일·블랙프라이데이 문구 19건: 노출 순위 중앙값 42위, 30일+ 0%</li>
+              <li>"PEAUX MORTES ? La vérité sur cet exfoliant", "On arrête de vous mentir sur la skincare" 같은 통념 깨기 영상이 상위 10위 안에 2건</li>
+              <li>바디 필 샷 영상이 158일째 프랑스 2위, 바디케어 비중(11건)이 미국(7건)·영국(3건)보다 높음</li>
+            </ul>
+            <p class="why">프랑스 소비자에겐 할인보다 "왜 이게 효과가 있는지" 설명하고 의심을 풀어주는 영상이 먹히는 것으로 보임</p>
+          </li>
+        </ol>
+      </div>
+      <div class="side">
+        <div class="card">
+          <span class="label">제안 · 내가 메디큐브 프랑스 담당이라면</span>
+          <ul>
+            <li><b>세일 소재 교체:</b> 브랜드 명의 세일 이미지는 줄이고, 상위권 크리에이터 루틴·통념 깨기 영상 끝에 Amazon.fr 딜 안내만 붙여 파트너십 광고로 운영</li>
+            <li><b>진입 상품 테스트:</b> 바디 필 샷을 프랑스 단독 진입 상품으로 두고 바디케어 크리에이터를 추가 섭외</li>
+            <li><b>크리에이터 풀:</b> 상위권에 UGC 전문 계정(ugcby…)이 많음 → 프랑스 UGC 크리에이터를 월 단위로 묶어 계약해 소재 공급 속도 확보</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="label">유의미한 전환 지표</span>
+          <ul class="kpi">
+            <li>Amazon.fr 상품별 리뷰 수 증가와 판매 순위</li>
+            <li>크리에이터 소재 14일 생존율(지금은 중앙값 4일)</li>
+            <li>루틴·통념 깨기형 vs 세일형 소재의 CTR·장바구니 담기</li>
+            <li>바디 필 샷 Amazon.fr 판매 순위와 재구매율</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <span class="label">추천 콘텐츠 주제 · 프랑스</span>
+        <div class="scroll"><table class="topics">
+          <thead><tr><th>주제</th><th>이렇게 만들기</th><th>근거</th><th>레퍼런스</th></tr></thead>
+          <tbody>
+            <tr><td>PDRN 3단계 루틴</td><td>"세 단계로 피부가 이렇게 됐다" 순서대로 보여주는 루틴 영상</td><td>프랑스 노출 1위</td><td><a href="https://www.facebook.com/ads/library/?id=2186689405224573" target="_blank" rel="noopener">1위 소재 ↗</a></td></tr>
+            <tr><td>통념 깨기 · 진실 공개</td><td>"각질 제거제의 진실", "스킨케어에 대한 거짓말" 식 질문 훅 → 성분 설명 → 결과</td><td>상위 10위 안 2건</td><td><a href="https://www.facebook.com/ads/library/?id=2309408059923492" target="_blank" rel="noopener">6위 소재 ↗</a></td></tr>
+            <tr><td>바디 필 샷</td><td>화장솜이 갈색으로 변하는 순간을 클로즈업, 바디 각질 고민</td><td>158일째 2위</td><td><a href="https://www.facebook.com/ads/library/?id=4084290361707056" target="_blank" rel="noopener">158일·2위 ↗</a></td></tr>
+            <tr><td>메이크업 전 프렙 스킨</td><td>"다들 프렙을 얕본다" 공감 훅 → 글래스 스킨 준비 루틴</td><td>159일째 9위</td><td><a href="https://www.facebook.com/ads/library/?id=990894530196673" target="_blank" rel="noopener">159일·9위 ↗</a></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="all-ads">
+    <header>
+      <h2>4. 전체 광고 통합 리스트</h2>
+      <p class="muted">광고 미리보기는 광고 라이브러리 상세 화면으로, 랜딩은 광고가 보내는 페이지로 열립니다.</p>
+    </header>
+    <p class="note">Ads Manager 수정 링크는 넣지 않았습니다. 수정 화면은 APR 광고 계정 권한이 있어야 열리기 때문입니다. 대신 페이지의 전체 광고 목록 링크를 달았습니다.</p>
+    <div class="tools">
+      <label for="q">문구·크리에이터·랜딩 검색<input type="search" id="q" placeholder="예: booster, amazon, 장원영" autocomplete="off"></label>
+      <label for="sort">정렬
+        <select id="sort">
+          <option value="score">효율 지수 높은 순</option><option value="days">운영일수 긴 순</option><option value="rank">노출 순위 높은 순</option><option value="start">최근 시작 순</option><option value="variants">복제 광고 많은 순</option>
+        </select>
+      </label>
+    </div>
+    <div class="pager" id="pager-top"></div>
+    <div class="scroll">
+      <table class="adtable">
+        <thead><tr><th>소재</th><th>페이지 / 크리에이터</th><th>형식</th><th>주제</th><th>시작일</th><th class="n">운영일수</th><th class="n">노출 순위</th><th class="n">복제</th><th>국가</th><th class="n">효율 지수</th><th>링크</th></tr></thead>
+        <tbody id="adtable"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager-bottom"></div>
+  </section>
+
+  <details>
+    <summary>지표 정의와 한계</summary>
+    <ul>
+      <li>운영일수: 광고 라이브러리의 게재 시작일부터 2026-11-21까지 일수. 꺼졌다 켜진 기간은 구분되지 않습니다.</li>
+      <li>노출 순위: 광고 라이브러리 "노출 많은 순" 정렬에서 해당 페이지 안의 순서(국가 전체 기준). 페이지마다 노출 상위 약 480개까지 수집했고, 순위 밖 소재는 노출 순위 점수를 0으로 둡니다.</li>
+      <li>국가: 국가별 검색(KR, US, JP, TW, HK, GB, CA, AU, SG, MY, TH, PH, DE, FR)에서 노출 상위 약 180개 안에 잡힌 국가만 표시됩니다. 나라별 "상위 20"은 그 나라 검색 결과 안의 순서입니다.</li>
+      <li>주제·훅: 광고 문구에 들어간 제품명·키워드로 자동 분류했습니다. 문구가 없거나 제품명이 없는 소재는 "주제 없음"입니다.</li>
+      <li>파트너십: 크리에이터 계정 명의로 나가는 브랜드 광고입니다.</li>
+      <li>CPC·ROAS·지출액은 광고주 계정에만 있어 공개 데이터로는 알 수 없습니다.</li>
+    </ul>
+  </details>
+  <footer>데이터: Meta 광고 라이브러리 공개 페이지(2026-11-21 수집) · 폰트: Paperlogy(SIL OFL)</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script>
+(() => {
+  const S = { brand: '', page: '', country: '', kind: '', q: '', sort: 'score', pg: 0, per: 50, topKind: '', cmp: ['ALL', 'US', 'GB', 'FR'] };
+  let ADS = [], COUNTS = [], THUMBS = new Map();
+  const fmt = d3.format(',');
+  const pct = (v) => (v == null || isNaN(v)) ? '—' : Math.round(v * 100) + '%';
+  const safe = (u) => (typeof u === 'string' && /^https?:\/\//.test(u)) ? u : null;
+  const median = (arr) => { const a = arr.filter((v) => v != null).sort((x, y) => x - y); if (!a.length) return null; const m = a.length >> 1; return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2); };
+  const CN = { ALL: '전체', KR: '한국', US: '미국', JP: '일본', TW: '대만', HK: '홍콩', GB: '영국', CA: '캐나다', AU: '호주', SG: '싱가포르', MY: '말레이시아', TH: '태국', PH: '필리핀', DE: '독일', FR: '프랑스' };
+  const PAGE_ID = { '메디큐브 KR': '253332005052281', '메디큐브 에이지알 KR': '100632876078862', 'Medicube Global': '1236886609665645', 'Medicube Japan': '1851827621741045', 'Medicube Taiwan': '1021543854613072', 'Medicube Hong Kong': '190505528088541', '에이프릴스킨 KR': '657120014400763', 'APRILSKIN Global': '1753020431647116' };
+  const FMT = { VIDEO: '영상', IMAGE: '이미지', CAROUSEL: '캐러셀', DPA: '카탈로그(DPA)', MULTI_IMAGES: '멀티 이미지', 'DCO(다이나믹)': '다이나믹(DCO)', MULTI_MEDIAS: '멀티 미디어', PAGE_LIKE: '페이지 좋아요' };
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const link = (href, text) => { const s = safe(href); if (!s) return null; const a = el('a', null, text); a.href = s; a.target = '_blank'; a.rel = 'noopener'; return a; };
+  const pageAll = (p) => PAGE_ID[p] ? 'https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&view_all_page_id=' + PAGE_ID[p] + '&search_type=page&sort_data[mode]=total_impressions&sort_data[direction]=desc' : null;
+  const landing = (d) => {
+    d = d || '';
+    if (/themedicube|aprilskin|medicube\./.test(d)) return '공식몰';
+    if (/amazon|amzn/.test(d)) return 'Amazon';
+    if (/oliveyoung|^oy\.run/.test(d)) return '올리브영';
+    if (/^(fb|facebook|m\.me|instagram)\./.test(d)) return '메타 내부(페이지·메신저)';
+    if (/naver/.test(d)) return '네이버';
+    if (/qoo10/.test(d)) return 'Qoo10';
+    if (/shopee/.test(d)) return 'Shopee';
+    if (/tiktok/.test(d)) return 'TikTok Shop';
+    if (/rakuten/.test(d)) return '라쿠텐';
+    if (!d) return '랜딩 없음';
+    return '기타';
+  };
+
+  function score(ads) {
+    const days = ads.map((a) => +a.days || 0).sort((x, y) => x - y);
+    const maxRank = {};
+    ads.forEach((a) => { if (a.imp_rank != null) maxRank[a.page] = Math.max(maxRank[a.page] || 0, +a.imp_rank); });
+    ads.forEach((a) => {
+      const pd = Math.min(1, d3.bisectLeft(days, +a.days || 0) / Math.max(1, days.length - 1));
+      const pr = a.imp_rank == null ? 0 : 1 - (+a.imp_rank - 1) / Math.max(1, maxRank[a.page]);
+      a.score = Math.round(50 * pd + 50 * pr);
+    });
+  }
+  const base = () => ADS.filter((a) => (!S.brand || a.brand === S.brand) && (!S.page || a.page === S.page) && (!S.kind || a.type === S.kind));
+  const scored = () => base().filter((a) => !S.country || (a.crank && a.crank[S.country] != null));
+
+  // ---------- filters ----------
+  const fPage = document.getElementById('f-page'), fCountry = document.getElementById('f-country');
+  function fillFilters() {
+    const pages = Array.from(new Set(COUNTS.filter((r) => !S.brand || r.brand === S.brand).map((r) => r.page)));
+    fPage.replaceChildren(new Option('전체', ''), ...pages.map((x) => new Option(x, x)));
+    if (!pages.includes(S.page)) S.page = '';
+    fPage.value = S.page;
+    const cs = Array.from(new Set(COUNTS.filter((r) => r.country !== 'ALL').map((r) => r.country)));
+    fCountry.replaceChildren(new Option('전체', ''), ...cs.map((c) => new Option((CN[c] || c) + ' (' + c + ')', c)));
+    fCountry.value = S.country;
+  }
+  const set = (k, v) => { S[k] = v || ''; S.pg = 0; render(); };
+  document.getElementById('f-brand').addEventListener('change', (e) => set('brand', e.target.value));
+  fPage.addEventListener('change', (e) => set('page', e.target.value));
+  fCountry.addEventListener('change', (e) => set('country', e.target.value));
+  document.getElementById('f-kind').addEventListener('change', (e) => set('kind', e.target.value));
+  document.getElementById('f-reset').addEventListener('click', () => {
+    Object.assign(S, { brand: '', page: '', country: '', kind: '', pg: 0 });
+    document.getElementById('f-brand').value = ''; document.getElementById('f-kind').value = '';
+    render();
+  });
+  const setCountry = (c) => set('country', S.country === c ? '' : c);
+
+  // ---------- KPI ----------
+  function renderKpis() {
+    const rows = scored();
+    const c = COUNTS.filter((r) => r.country === (S.country || 'ALL') && (!S.brand || r.brand === S.brand) && (!S.page || r.page === S.page));
+    const active = d3.sum(c, (r) => +r.active_ads), n = rows.length;
+    const long = n ? rows.filter((a) => +a.days > 30).length / n : null;
+    document.getElementById('k-active').textContent = fmt(active);
+    document.getElementById('k-collected').textContent = fmt(n);
+    const md = median(rows.map((a) => +a.days));
+    document.getElementById('k-median').textContent = md == null ? '—' : fmt(md) + '일';
+    document.getElementById('k-long').textContent = pct(long);
+    document.getElementById('k-partner').textContent = pct(n ? rows.filter((a) => a.type !== '브랜드 직접').length / n : null);
+    const bc = byCountry();
+    const lede = document.getElementById('lede'); lede.replaceChildren();
+    const b = (t) => el('b', null, t);
+    lede.append('지금 ', b(fmt(active)), '개 광고가 돌고 있습니다. 수집한 소재 ', b(fmt(n)), '개 중 ', b(pct(long)), '가 30일 넘게 살아남았고, 광고가 가장 많이 도는 국가는 ', b(bc.length ? (CN[bc[0].country] || bc[0].country) + '(' + fmt(bc[0].total) + '개)' : '—'), '입니다.');
+  }
+
+  // ---------- country ----------
+  function byCountry() {
+    const rows = COUNTS.filter((r) => r.country !== 'ALL' && (!S.brand || r.brand === S.brand) && (!S.page || r.page === S.page));
+    const by = d3.rollup(rows, (v) => ({ m: d3.sum(v.filter((r) => r.brand === '메디큐브'), (r) => +r.active_ads), a: d3.sum(v.filter((r) => r.brand === '에이프릴스킨'), (r) => +r.active_ads) }), (r) => r.country);
+    return Array.from(by, ([country, v]) => ({ country, m: v.m, a: v.a, total: v.m + v.a })).filter((r) => r.total > 0).sort((x, y) => y.total - x.total);
+  }
+  function renderCountryBars() {
+    const box = document.getElementById('country-bars'); box.replaceChildren();
+    const rows = byCountry(); const W = box.clientWidth || 400, rowH = 26;
+    const svg = d3.select(box).append('svg').attr('role', 'img').attr('aria-label', '국가별 활성 광고 수 막대 차트');
+    const tmp = svg.append('g'); let lw = 0;
+    rows.forEach((r) => { lw = Math.max(lw, tmp.append('text').text(CN[r.country] || r.country).node().getComputedTextLength()); }); tmp.remove();
+    const m = { l: lw + 10, r: 48, t: 4, b: 4 }, H = rows.length * rowH + m.t + m.b;
+    svg.attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const x = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.total) || 1]).range([m.l, W - m.r]);
+    const y = d3.scaleBand().domain(rows.map((r) => r.country)).range([m.t, H - m.b]).padding(0.25);
+    const tip = d3.select(box).append('div').attr('class', 'tip').style('display', 'none');
+    const g = svg.selectAll('g.r').data(rows).join('g').style('cursor', 'pointer').style('opacity', (d) => !S.country || S.country === d.country ? 1 : 0.35)
+      .on('click', (e, d) => setCountry(d.country))
+      .on('mousemove', (e, d) => { const [mx, my] = d3.pointer(e, box); tip.style('display', 'block').style('left', Math.min(mx + 12, W - 200) + 'px').style('top', (my + 12) + 'px').html(''); tip.append('div').text((CN[d.country] || d.country) + ' · ' + fmt(d.total) + '개'); tip.append('div').attr('class', 'k').text('메디큐브 ' + fmt(d.m) + ' / 에이프릴스킨 ' + fmt(d.a)); })
+      .on('mouseleave', () => tip.style('display', 'none'));
+    g.append('rect').attr('x', x(0)).attr('y', (d) => y(d.country)).attr('height', y.bandwidth()).attr('width', (d) => x(d.m) - x(0)).attr('rx', 2).style('fill', 'var(--c0)');
+    g.append('rect').attr('x', (d) => x(d.m)).attr('y', (d) => y(d.country)).attr('height', y.bandwidth()).attr('width', (d) => x(d.total) - x(d.m)).attr('rx', 2).style('fill', 'var(--c1)');
+    g.append('text').attr('x', m.l - 8).attr('y', (d) => y(d.country) + y.bandwidth() / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text((d) => CN[d.country] || d.country);
+    g.append('text').attr('x', (d) => x(d.total) + 6).attr('y', (d) => y(d.country) + y.bandwidth() / 2).attr('dy', '0.35em').text((d) => fmt(d.total));
+  }
+  function renderHeat() {
+    const rows = COUNTS.filter((r) => (!S.brand || r.brand === S.brand) && (!S.page || r.page === S.page));
+    const cs = Array.from(new Set(rows.filter((r) => r.country !== 'ALL').map((r) => r.country)));
+    const pages = Array.from(new Set(rows.map((r) => r.page)));
+    const v = new Map(rows.map((r) => [r.page + '|' + r.country, +r.active_ads]));
+    const max = d3.max(rows.filter((r) => r.country !== 'ALL'), (r) => +r.active_ads) || 1;
+    const head = document.getElementById('heat-head'), body = document.getElementById('heat-body');
+    const tr = el('tr'); tr.append(el('th', null, '페이지'), el('th', 'n', '전체'));
+    cs.forEach((c) => { const th = el('th', 'n', c); th.title = CN[c] || c; tr.append(th); });
+    head.replaceChildren(tr); body.replaceChildren();
+    pages.forEach((pg) => {
+      const r = el('tr'); const t0 = el('td', null, pg); t0.style.whiteSpace = 'nowrap'; r.append(t0);
+      const ta = el('td', 'n', fmt(v.get(pg + '|ALL') || 0)); ta.style.fontWeight = '600'; r.append(ta);
+      cs.forEach((c) => {
+        const n = v.get(pg + '|' + c) || 0; const td = el('td', 'n clk' + (n ? '' : ' z'), n ? fmt(n) : '·');
+        if (n) td.style.background = `color-mix(in srgb, var(--c0) ${Math.round(8 + 50 * Math.sqrt(n / max))}%, transparent)`;
+        if (S.country === c) td.style.outline = '1.5px solid var(--c0)';
+        td.addEventListener('click', () => setCountry(c)); r.append(td);
+      });
+      body.append(r);
+    });
+  }
+
+  // ---------- days hist ----------
+  function renderHist() {
+    const box = document.getElementById('days-hist'); box.replaceChildren();
+    const sc = scored();
+    const bins = [['1–7일', 1, 7], ['8–14일', 8, 14], ['15–30일', 15, 30], ['31–60일', 31, 60], ['61–90일', 61, 90], ['91–180일', 91, 180], ['181–365일', 181, 365], ['1년+', 366, 1e9]];
+    const rows = bins.map(([bucket, lo, hi]) => { const v = sc.filter((a) => +a.days >= lo && +a.days <= hi); return { bucket, b: v.filter((a) => a.type === '브랜드 직접').length, p: v.filter((a) => a.type !== '브랜드 직접').length }; });
+    const W = box.clientWidth || 400, H = 260, m = { l: 36, r: 8, t: 18, b: 28 };
+    const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H).attr('role', 'img').attr('aria-label', '운영일수 구간별 소재 수');
+    const x = d3.scaleBand().domain(rows.map((r) => r.bucket)).range([m.l, W - m.r]).padding(0.2);
+    const y = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.b + r.p) || 1]).nice().range([H - m.b, m.t]);
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(d3.format('~s'))).call((a) => a.select('.domain').remove());
+    const xa = svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickSize(0).tickPadding(8));
+    if (x.bandwidth() < 44) xa.selectAll('text').text((d, i) => i % 2 ? '' : d);
+    const tip = d3.select(box).append('div').attr('class', 'tip').style('display', 'none');
+    const g = svg.selectAll('g.b').data(rows).join('g')
+      .on('mousemove', (e, d) => { const [mx, my] = d3.pointer(e, box); tip.style('display', 'block').style('left', Math.min(mx + 12, W - 180) + 'px').style('top', my + 'px').html(''); tip.append('div').text(d.bucket + ' · ' + fmt(d.b + d.p) + '개'); tip.append('div').attr('class', 'k').text('브랜드 ' + fmt(d.b) + ' / 파트너십 ' + fmt(d.p)); })
+      .on('mouseleave', () => tip.style('display', 'none'));
+    g.append('rect').attr('x', (d) => x(d.bucket)).attr('width', x.bandwidth()).attr('y', (d) => y(d.b)).attr('height', (d) => y(0) - y(d.b)).style('fill', 'var(--c0)');
+    g.append('rect').attr('x', (d) => x(d.bucket)).attr('width', x.bandwidth()).attr('y', (d) => y(d.b + d.p)).attr('height', (d) => y(d.b) - y(d.b + d.p)).style('fill', 'var(--c1)');
+    g.append('text').attr('x', (d) => x(d.bucket) + x.bandwidth() / 2).attr('y', (d) => y(d.b + d.p) - 4).attr('text-anchor', 'middle').text((d) => d.b + d.p ? fmt(d.b + d.p) : '');
+  }
+
+  // ---------- scatter ----------
+  function renderScatter() {
+    const box = document.getElementById('scatter'); box.replaceChildren();
+    const rows = scored().filter((a) => a.imp_rank != null && +a.days > 0);
+    const W = box.clientWidth || 400, H = 280, m = { l: 44, r: 12, t: 10, b: 34 };
+    const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H).attr('role', 'img').attr('aria-label', '운영일수와 노출 순위 산점도');
+    const x = d3.scaleLog().domain([1, Math.max(30, d3.max(rows, (a) => +a.days) || 30)]).range([m.l, W - m.r]).clamp(true);
+    const y = d3.scaleLog().domain([Math.max(10, d3.max(rows, (a) => +a.imp_rank) || 10), 1]).range([H - m.b, m.t]).clamp(true);
+    const r = d3.scaleSqrt().domain([1, Math.max(2, d3.max(rows, (a) => +a.variants) || 2)]).range([2.5, 9]);
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues([1, 7, 30, 90, 180, 365, 730].filter((v) => v <= x.domain()[1])).tickFormat((v) => v + '일').tickSize(-(H - m.t - m.b))).call((a) => a.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues([1, 10, 50, 100, 300].filter((v) => v <= y.domain()[0])).tickFormat((v) => v + '위').tickSize(-(W - m.l - m.r))).call((a) => a.select('.domain').remove());
+    svg.append('line').attr('x1', x(30)).attr('x2', x(30)).attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--muted)').style('stroke-dasharray', '3 3');
+    svg.append('text').attr('x', x(30) + 4).attr('y', m.t + 10).text('30일');
+    const tip = d3.select(box).append('div').attr('class', 'tip').style('display', 'none');
+    svg.append('g').selectAll('circle').data(rows).join('circle')
+      .attr('cx', (a) => x(+a.days)).attr('cy', (a) => y(+a.imp_rank)).attr('r', (a) => r(+a.variants || 1))
+      .style('fill', (a) => a.type === '브랜드 직접' ? 'var(--c0)' : 'var(--c1)').style('fill-opacity', 0.55).style('stroke', 'var(--panel)').style('stroke-width', 0.5)
+      .on('mousemove', (e, a) => { const [mx, my] = d3.pointer(e, box); tip.style('display', 'block').style('left', Math.min(mx + 12, W - 280) + 'px').style('top', Math.min(my + 12, H - 60) + 'px').html(''); tip.append('div').text(a.page + (a.creator ? ' · ' + a.creator : '')); tip.append('div').attr('class', 'k').text((a.body || a.title || '').slice(0, 90)); tip.append('div').text(fmt(a.days) + '일 · 노출 ' + a.imp_rank + '위 · 복제 ' + a.variants + ' · 지수 ' + a.score); })
+      .on('mouseleave', () => tip.style('display', 'none'));
+  }
+
+  // ---------- country compare (format / landing / topic) ----------
+  const checks = document.getElementById('cmp-checks');
+  function buildChecks() {
+    const cs = ['ALL', ...Array.from(new Set(COUNTS.filter((r) => r.country !== 'ALL').map((r) => r.country)))];
+    checks.replaceChildren(...cs.map((c) => {
+      const lab = el('label', 'chk'); const inp = el('input'); inp.type = 'checkbox'; inp.value = c; inp.id = 'cmp-' + c; inp.checked = S.cmp.includes(c);
+      inp.addEventListener('change', () => { S.cmp = Array.from(checks.querySelectorAll('input:checked')).map((i) => i.value); renderCompare(); });
+      lab.append(inp, CN[c] || c); return lab;
+    }));
+  }
+  function groupTable(rows, keyFn, c, label) {
+    const stats = [];
+    d3.group(rows.flatMap((a) => [].concat(keyFn(a)).map((k) => [k, a])), (d) => d[0]).forEach((pairs, k) => {
+      const v = pairs.map((p) => p[1]);
+      stats.push({ k, n: v.length, md: median(v.map((a) => +a.days)), long: v.filter((a) => +a.days > 30).length / v.length, sc: Math.round(d3.mean(v, (a) => a.score)), top: c === 'ALL' ? v.filter((a) => a.imp_rank != null && a.imp_rank <= 50).length : v.filter((a) => a.crank[c] <= 20).length });
+    });
+    stats.sort((a, b) => b.n - a.n);
+    const maxN = d3.max(stats, (s) => s.n) || 1;
+    const wrap = el('div', 'scroll'); const t = el('table');
+    const hr = el('tr'); [[label, ''], ['소재', 'n'], ['운영 중앙', 'n'], ['30일+', 'n'], ['지수', 'n'], ['상위 20', 'n']].forEach(([h, c2]) => hr.append(el('th', c2, h)));
+    const th = el('thead'); th.append(hr); const tb = el('tbody');
+    stats.forEach((s) => {
+      const tr = el('tr');
+      tr.append(el('td', null, s.k));
+      const nc = el('td', 'n bar-cell'); const bar = el('span', 'b'); bar.style.width = Math.round(100 * s.n / maxN) + '%'; nc.append(bar, el('span', 't', fmt(s.n))); tr.append(nc);
+      tr.append(el('td', 'n', s.md == null ? '—' : fmt(s.md) + '일'), el('td', 'n', pct(s.long)), el('td', 'n', String(s.sc)), el('td', 'n', fmt(s.top)));
+      tb.append(tr);
+    });
+    t.append(th, tb); wrap.append(t); return wrap;
+  }
+  function renderCompare() {
+    const grid = document.getElementById('cmp-grid'); grid.replaceChildren();
+    const b = base();
+    if (!S.cmp.length) { grid.append(el('p', 'muted', '나라를 하나 이상 체크하세요.')); return; }
+    S.cmp.forEach((c) => {
+      const rows = c === 'ALL' ? b : b.filter((a) => a.crank && a.crank[c] != null);
+      const card = el('div', 'card cmp-card');
+      const h = el('h3', null, CN[c] || c); h.append(el('span', 'cnt', '소재 ' + fmt(rows.length) + '개')); card.append(h);
+      if (!rows.length) { card.append(el('p', 'muted', '이 조건에 맞는 소재가 없습니다.')); grid.append(card); return; }
+      card.append(el('h4', null, '소재 형식별'), groupTable(rows, (a) => FMT[a.format] || a.format || '기타', c, '형식'));
+      card.append(el('h4', null, '랜딩 채널별'), groupTable(rows, (a) => landing(a.landing_domain), c, '랜딩'));
+      card.append(el('h4', null, '콘텐츠 주제별'), groupTable(rows, (a) => a.topics && a.topics.length ? a.topics : ['주제 없음'], c, '주제'));
+      card.append(el('h4', null, '메시지 훅별'), groupTable(rows.filter((a) => a.hooks && a.hooks.length), (a) => a.hooks, c, '훅'));
+      grid.append(card);
+    });
+  }
+
+  // ---------- top cards ----------
+  document.querySelectorAll('.top-tab').forEach((t) => t.addEventListener('click', () => {
+    S.topKind = t.dataset.kind || '';
+    document.querySelectorAll('.top-tab').forEach((x) => x.setAttribute('aria-selected', String(x === t)));
+    renderTop();
+  }));
+  function adThumb(a, cls) {
+    const src = THUMBS.get(a.ad_id);
+    if (src && src.startsWith('data:image/')) { const im = el('img'); im.src = src; im.alt = ''; im.loading = 'lazy'; return im; }
+    return el('div', cls, FMT[a.format] || a.format);
+  }
+  function renderTop() {
+    const pool = scored().filter((a) => !S.topKind || a.type === S.topKind);
+    const sum = document.getElementById('top-summary'), box = document.getElementById('top-cards');
+    box.replaceChildren();
+    if (!pool.length) { sum.textContent = '이 조건에 맞는 소재가 없습니다. 상단 광고 유형 필터를 확인하세요.'; return; }
+    const top = pool.slice().sort((a, b) => b.score - a.score || b.days - a.days).slice(0, 12);
+    sum.textContent = `대상 ${fmt(pool.length)}개 · 상위 ${top.length}건 평균 효율 지수 ${Math.round(d3.mean(top, (a) => a.score))} · 평균 운영일수 ${fmt(Math.round(d3.mean(top, (a) => +a.days)))}일 · 전체 평균 효율 지수 ${Math.round(d3.mean(pool, (a) => a.score))}`;
+    top.forEach((a) => {
+      const c = el('article', 'ad'); const ph = el('div', 'ph'); ph.append(adThumb(a, '')); c.append(ph);
+      const bd = el('div', 'bd');
+      const row = el('div'); row.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;gap:8px';
+      row.append(el('span', 'muted', a.page + (a.creator ? ' · ' + a.creator : '')), el('span', 'score', String(a.score)));
+      const mt = el('div', 'meta');
+      [[fmt(a.days) + '일', +a.days > 90], ['노출 ' + (a.imp_rank ?? '–') + '위', a.imp_rank != null && +a.imp_rank <= 10], [FMT[a.format] || a.format], ['복제 ' + a.variants]].forEach(([t, hot]) => mt.append(el('span', 'chip' + (hot ? ' hot' : ''), t)));
+      (a.topics || []).slice(0, 2).forEach((t) => mt.append(el('span', 'chip', t)));
+      const lk = el('div', 'links'); [link(a.preview_url, '광고 미리보기 ↗'), link(a.landing_url, '랜딩 ↗')].forEach((x) => x && lk.append(x));
+      bd.append(row, el('div', 'txt', a.body || a.title || '(문구 없음)'), mt, lk); c.append(bd); box.append(c);
+    });
+  }
+
+  // ---------- insights tabs ----------
+  document.querySelectorAll('.ins-tab').forEach((t) => t.addEventListener('click', () => {
+    document.querySelectorAll('.ins-tab').forEach((x) => x.setAttribute('aria-selected', String(x === t)));
+    document.querySelectorAll('[data-ins]').forEach((p) => { p.hidden = p.dataset.ins !== t.dataset.c; });
+  }));
+
+  // ---------- full list ----------
+  const qEl = document.getElementById('q'), sortEl = document.getElementById('sort');
+  qEl.addEventListener('input', () => { S.q = qEl.value.trim().toLowerCase(); S.pg = 0; renderList(); });
+  sortEl.addEventListener('change', () => { S.sort = sortEl.value; S.pg = 0; renderList(); });
+  function listRows() {
+    let rows = scored();
+    if (S.q) rows = rows.filter((a) => (a.body + ' ' + a.title + ' ' + a.creator + ' ' + a.landing_domain + ' ' + a.page + ' ' + a.ad_id + ' ' + (a.topics || []).join(' ')).toLowerCase().includes(S.q));
+    const cmp = { score: (a, b) => b.score - a.score, days: (a, b) => b.days - a.days, rank: (a, b) => (a.imp_rank ?? 1e9) - (b.imp_rank ?? 1e9), start: (a, b) => (b.start > a.start ? 1 : b.start < a.start ? -1 : 0), variants: (a, b) => b.variants - a.variants }[S.sort];
+    return rows.slice().sort(cmp);
+  }
+  function renderList() {
+    const rows = listRows(), pages = Math.max(1, Math.ceil(rows.length / S.per)); if (S.pg >= pages) S.pg = pages - 1;
+    ['pager-top', 'pager-bottom'].forEach((id) => {
+      const p = document.getElementById(id); p.replaceChildren();
+      const mk = (t, d, dis) => { const b = el('button', 'btn', t); b.type = 'button'; b.disabled = dis; b.addEventListener('click', () => { S.pg += d; renderList(); }); return b; };
+      p.append(mk('← 이전', -1, S.pg === 0), mk('다음 →', 1, S.pg >= pages - 1), el('span', null, rows.length ? `${fmt(S.pg * S.per + 1)}–${fmt(Math.min(rows.length, (S.pg + 1) * S.per))} / ${fmt(rows.length)}개` : '조건에 맞는 광고가 없습니다.'));
+    });
+    const tb = document.getElementById('adtable'); tb.replaceChildren();
+    rows.slice(S.pg * S.per, (S.pg + 1) * S.per).forEach((a) => {
+      const tr = el('tr'); const td = (cls, t) => { const x = el('td', cls, t); tr.append(x); return x; };
+      const c1 = td('ad-c'); const box = el('div', 'cell-ad'); box.append(adThumb(a, 'noimg'), el('div', 'clip', a.body || a.title || '(문구 없음)')); c1.append(box);
+      const c2 = td(null, a.page); if (a.creator) c2.append(el('div', 'muted', '파트너십 · ' + a.creator));
+      td(null, FMT[a.format] || a.format);
+      const ct = td(); ct.style.fontSize = '12px'; ct.textContent = (a.topics || []).join(', ') || '–';
+      const c4 = td(null, a.start); c4.style.whiteSpace = 'nowrap';
+      td('n', fmt(a.days)); td('n', a.imp_rank == null ? '–' : String(a.imp_rank)); td('n', String(a.variants));
+      const c8 = td(null, a.countries || '–'); c8.style.fontSize = '12px';
+      td('n', String(a.score));
+      const lk = td('lk'); [link(a.preview_url, '미리보기 ↗'), link(a.landing_url, '랜딩 ↗'), link(pageAll(a.page), '페이지 전체 ↗')].forEach((x) => x && lk.append(x));
+      tb.append(tr);
+    });
+  }
+
+  function render() { fillFilters(); renderKpis(); renderCountryBars(); renderHeat(); renderHist(); renderScatter(); renderCompare(); renderTop(); renderList(); }
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { renderCountryBars(); renderHist(); renderScatter(); }, 150); });
+
+  Promise.all([fetch('data/ads.json').then((r) => r.json()), fetch('data/country_counts.json').then((r) => r.json())])
+    .then(([ads, counts]) => { ADS = ads; COUNTS = counts; score(ADS); buildChecks(); render(); })
+    .catch(() => { document.getElementById('lede').textContent = '데이터를 불러오지 못했습니다. 페이지를 새로고침해 주세요.'; });
+  fetch('data/thumbs.json').then((r) => r.json()).then((t) => { THUMBS = new Map(t.map((r) => [r.ad_id, r.img])); if (ADS.length) { renderTop(); renderList(); } }).catch(() => {});
+})();
+</script>
+</body>
+</html>
