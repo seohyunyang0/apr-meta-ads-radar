@@ -47,7 +47,15 @@
   .lede { max-width: 72ch; font-size: 1.05rem; }
   .lede b { font-weight: 700; font-variant-numeric: tabular-nums; }
 
-  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; position: sticky; top: 0; z-index: 20; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+  .anchor { position: sticky; top: 0; z-index: 30; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .anchor-in { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .anchor-in::-webkit-scrollbar { display: none; }
+  .anchor a { flex: none; display: block; padding: 14px 14px 12px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .anchor a:hover { color: var(--fg); }
+  .anchor a[aria-current="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+  section[id] { scroll-margin-top: 160px; }
+  @media (max-width: 640px) { .filters { position: static; } section[id] { scroll-margin-top: 64px; } }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; position: sticky; top: var(--nav-h, 51px); z-index: 20; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
   .filters label, .tools label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
   select, input[type=search] { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background-color: var(--panel); color: var(--fg); min-width: 0; max-width: 100%; }
   select { min-width: 9rem; }
@@ -145,6 +153,14 @@
 </style>
 </head>
 <body>
+<nav class="anchor" aria-label="섹션 바로가기">
+  <div class="anchor-in">
+    <a href="#by-country" data-sec="by-country">국가별</a>
+    <a href="#efficiency" data-sec="efficiency">효율별</a>
+    <a href="#insights" data-sec="insights">인사이트</a>
+    <a href="#all-ads" data-sec="all-ads">통합</a>
+  </div>
+</nav>
 <div class="wrap">
 
   <header class="head" id="top">
@@ -233,7 +249,7 @@
 
   <section id="insights">
     <header>
-      <h2>3. 나라별 인사이트와 제안</h2>
+      <h2>3. 나라별 인사이트와 제안 (미국, 프랑스, 영국 only)</h2>
       <p class="muted">2026-11-21 수집 데이터로 쓴 회고입니다. 미국·영국·프랑스 광고는 모두 Medicube Global 페이지에서 나갑니다. 숫자는 각 나라 검색에서 노출 상위 약 180건 안에 잡힌 소재 기준입니다.</p>
     </header>
     <div class="tabs" role="tablist" aria-label="나라">
@@ -774,11 +790,28 @@
     });
   }
 
+  // ---------- anchor bar ----------
+  const navLinks = Array.from(document.querySelectorAll('.anchor a'));
+  const secs = navLinks.map((a) => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const markNav = () => {
+    const y = window.scrollY + 170; let cur = null;
+    secs.forEach((sec) => { if (sec.offsetTop <= y) cur = sec.id; });
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 4) cur = secs[secs.length - 1].id;
+    navLinks.forEach((a) => a.setAttribute('aria-current', String(a.dataset.sec === cur)));
+  };
+  const setNavH = () => document.documentElement.style.setProperty('--nav-h', Math.ceil(document.querySelector('.anchor').getBoundingClientRect().height) + 'px');
+  setNavH(); window.addEventListener('resize', setNavH);
+  window.addEventListener('scroll', markNav, { passive: true }); markNav();
+
   function render() { fillFilters(); renderKpis(); renderCountryBars(); renderHeat(); renderHist(); renderScatter(); renderCompare(); renderTop(); renderList(); }
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { renderCountryBars(); renderHist(); renderScatter(); }, 150); });
 
   Promise.all([fetch('data/ads.json').then((r) => r.json()), fetch('data/country_counts.json').then((r) => r.json())])
-    .then(([ads, counts]) => { ADS = ads; COUNTS = counts; score(ADS); buildChecks(); render(); })
+    .then(([ads, counts]) => {
+      ADS = ads; COUNTS = counts; score(ADS); buildChecks(); render();
+      const h = location.hash.slice(1); const t = h && document.getElementById(h);
+      if (t) requestAnimationFrame(() => { t.scrollIntoView(); markNav(); }); else markNav();
+    })
     .catch(() => { document.getElementById('lede').textContent = '데이터를 불러오지 못했습니다. 페이지를 새로고침해 주세요.'; });
   fetch('data/thumbs.json').then((r) => r.json()).then((t) => { THUMBS = new Map(t.map((r) => [r.ad_id, r.img])); if (ADS.length) { renderTop(); renderList(); } }).catch(() => {});
 })();
