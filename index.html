@@ -30,6 +30,7 @@
     --c0: #7d95ff; --c1: #ff7fa0; --ok: #5cc596; --warn: #e3b25a; --bad: #f07a72; color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; }
   body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
   .wrap { max-width: 1240px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 48px; }
@@ -69,7 +70,7 @@
 
   section { display: flex; flex-direction: column; gap: 16px; }
   section > header { display: flex; flex-direction: column; gap: 6px; }
-  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .chart { position: relative; min-height: 260px; }
   .chart svg { display: block; width: 100%; overflow: visible; }
@@ -119,7 +120,7 @@
   .links { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; margin-top: auto; }
 
   /* insights */
-  .ins { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; }
+  .ins { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 880px) { .ins { grid-template-columns: 1fr; } }
   .ins .one { font-size: 1.1rem; font-weight: 700; line-height: 1.5; text-wrap: pretty; }
   .ins ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 14px; }
@@ -167,7 +168,7 @@
     <span class="eyebrow">META AD LIBRARY · 2026-11-21 수집</span>
     <h1>APR 메타 광고 레이더</h1>
     <p class="lede" id="lede">메디큐브·에이프릴스킨 공식 페이지 8곳의 활성 광고를 불러오는 중입니다.</p>
-    <p class="muted">활성 광고만 · CPC·ROAS는 비공개라 운영일수와 노출 순위로 효율을 대신 봅니다</p>
+    <p class="muted">활성 광고만 · CPC·ROAS는 공개되지 않으므로 운영일수와 노출 순위로 효율을 해석했습니다</p>
   </header>
 
   <div class="filters" role="group" aria-label="필터">
@@ -199,7 +200,7 @@
       <div class="card">
         <h3>국가별 활성 광고 수</h3>
         <div class="legend"><span><i class="sw0"></i>메디큐브</span><span><i class="sw1"></i>에이프릴스킨</span></div>
-        <div class="chart" id="country-bars" style="min-height:380px"></div>
+        <div class="chart" id="country-bars" style="min-height:120px"></div>
       </div>
       <div class="card">
         <h3>페이지 × 국가 매트릭스</h3>
@@ -250,7 +251,7 @@
   <section id="insights">
     <header>
       <h2>3. 나라별 인사이트와 제안 (미국, 프랑스, 영국 only)</h2>
-      <p class="muted">2026-11-21 수집 데이터로 쓴 회고입니다. 미국·영국·프랑스 광고는 모두 Medicube Global 페이지에서 나갑니다. 숫자는 각 나라 검색에서 노출 상위 약 180건 안에 잡힌 소재 기준입니다.</p>
+      <p class="muted">2026-11-21 수집 데이터로 쓴 회고입니다. 미국·영국·프랑스 광고 데이터는 각 나라 검색에서 노출 상위 약 180건 안에 잡힌 소재 기준입니다. 지원 국가가 미국이기 때문에 미국 광고 성과를 위주로 작성했으며, 영국과 프랑스는 지원 국가가 아니기 때문에 간결히 작성한 점 말씀드립니다.</p>
     </header>
     <div class="tabs" role="tablist" aria-label="나라">
       <button type="button" role="tab" class="tab ins-tab" data-c="US" aria-selected="true">미국</button>
@@ -261,7 +262,7 @@
     <!-- 미국 -->
     <div class="ins" data-ins="US">
       <div class="card">
-        <span class="label">인사이트 · 미국 (소재 130건)</span>
+        <span class="label">인사이트 · 미국 (메디큐브 소재 130건)</span>
         <p class="one">부스터 프로 X2 크리에이터 주제 &amp; Amazon 랜딩 구조가 노출을 쥐고 있음</p>
         <ol>
           <li><b>미국 노출 상위는 부스터 프로 X2 크리에이터 언박싱이 장악</b>
@@ -294,10 +295,10 @@
         <div class="card">
           <span class="label">제안 · 내가 메디큐브 미국 담당이라면</span>
           <ul>
-            <li><b>블프 주간(최우선) · 언박싱 소재에 블프 가격 얹기:</b> 지금 미국 블프 소재 20건은 전부 브랜드 이미지이고 노출 상위 20위 안에 하나도 없음. 반면 미국 노출 상위 20위 중 14건이 크리에이터 소재, 10건이 부스터 프로. 노출은 크리에이터 언박싱이 받고 있는데 세일 메시지는 학습이 안 된 브랜드 이미지에만 실려 있는 상태. 이미 노출을 받는 언박싱 소재(Tqstaceyy 1·2위, nataliehalcro 8위, averykatherine 9위)를 파트너십 광고로 복제하고 첫 3초 자막에 블프 가격을 얹어 Amazon 딜 페이지로 보냄. 새 세일 이미지를 처음부터 학습시키는 것보다 11/27 전에 세일 노출을 확보하는 가장 빠른 방법</li>
-            <li><b>신규 소재 · 글레이즈드 도넛 피부를 집에서 5분:</b> 오래 버티는 두 카피("hydrafacial at home in just 5 minutes" 398일, "glazed donut skin" 195일째 7위)를 합쳐, 글레이즈드 도넛 피부를 집에서 5분 만에 만들 수 있다는 주제로 부스터 프로 크리에이터 소재를 추가 제작</li>
-            <li><b>상시 소재:</b> 398일째 도는 "hydrafacial at home" 메시지를 크리에이터 버전으로 다시 만듦. 피부관리실 1회 비용과 기기 가격을 나란히 보여주는 구성</li>
-            <li><b>자사몰:</b> 블프에 Amazon으로 기기를 산 사람이 다시 올 이유를 만듦. 자사몰 전용 기기+콜라겐 마스크 세트를 리타겟팅 카탈로그 광고로 상시 운영</li>
+            <li><b>언박싱 소재에 블프 가격 얹는 배리소재 제안:</b> 지금 미국 블프 소재 20건은 전부 브랜드 이미지이고 노출 상위 20위 안에 하나도 없음. 반면 미국 노출 상위 20위 중 14건이 크리에이터 소재, 10건이 부스터 프로. 노출은 크리에이터 언박싱이 받고 있는데 세일 메시지는 학습이 안 된 브랜드 이미지에만 실려 있는 상태라 세팅이 비효율적인 상태. 이미 노출을 받는 언박싱 소재(Tqstaceyy 1·2위, nataliehalcro 8위, averykatherine 9위)를 파트너십 광고로 복제하고 첫 3초 자막에 블프 가격을 얹어 Amazon 딜 페이지로 보내는 것 제안. 새 세일 이미지를 처음부터 학습시키는 것보다 11/27 전에 세일 노출을 확보하는 가장 빠른 방법.</li>
+            <li><b>"글레이즈드 도넛 피부를 집에서 5분" + 크리에이터 파트너십 소재 추가 제작 제안:</b> 오래 버티는 두 카피("hydrafacial at home in just 5 minutes" 398일, "glazed donut skin" 195일째 7위)를 합쳐, 글레이즈드 도넛 피부를 집에서 5분 만에 만들 수 있다는 주제로 부스터 프로 크리에이터 소재를 추가 제작 제안</li>
+            <li><b>상시 소재 중 398일째 도는 "hydrafacial at home" 메시지를 크리에이터 버전으로 다시 만드는 것 제안:</b> 피부관리실 1회 비용과 기기 가격을 나란히 보여주는 구성 포함 필요</li>
+            <li><b>자사몰 전략으로는 카탈로그 광고 운영 제안:</b> 블프에 Amazon으로 기기를 산 사람이 다시 올 이유를 만들어야 하기 때문에 자사몰 전용 기기+콜라겐 마스크 세트를 리타겟팅 카탈로그 광고로 상시 운영을 제안</li>
           </ul>
         </div>
         <div class="card">
@@ -327,7 +328,7 @@
     <!-- 영국 -->
     <div class="ins" data-ins="GB" hidden>
       <div class="card">
-        <span class="label">인사이트 · 영국 (소재 102건)</span>
+        <span class="label">인사이트 · 영국 (메디큐브 소재 102건)</span>
         <p class="one">영국은 소재 대부분이 파트너십 광고이고, 미국에서 잘 되는 디바이스보다 모공·콜라겐 마스크 같은 '바로 보이는 고민 해결' 소모품이 오래 감</p>
         <ol>
           <li><b>영국 소재의 89%가 파트너십 광고</b>
@@ -335,13 +336,11 @@
               <li>102건 중 91건이 크리에이터 명의, 노출 상위 20위권 22건 중 19건이 크리에이터</li>
               <li>브랜드 자체 소재 11건은 운영일수 중앙값 9일로 크리에이터(32일)보다 훨씬 빨리 꺼짐</li>
             </ul>
-            <p class="why">영국은 브랜드 명의 광고보다 크리에이터 리뷰 형식이 학습을 잘 타는 시장으로 보임</p>
+            <p class="why">영국은 시장 진입 초기이기 때문에 크리에이터 리뷰 형식으로 소비자들의 페인포인트를 해결하는 소재들이 학습을 잘 타고 있음</p>
           </li>
           <li><b>미국 1위 부스터 프로가 영국에선 약세, 대신 모공·콜라겐 마스크가 강세</b>
             <ul>
-              <li>부스터 프로 소재 17건: 중앙값 12일, 30일+ 18%, 상위 20위 0건</li>
-              <li>콜라겐 랩핑 마스크 27건: 중앙값 73일, 상위 20위 9건 / 모공·제로패드 17건: 30일+ 82%</li>
-              <li>영국 노출 1위는 "ZERO PORE BLACKHEAD MUD MASK" 크리에이터 영상(117일째)</li>
+              <li>제품별 소재 성과를 볼 때 부스터 프로 소재 17건(상위 20위 0건) &lt;&lt; 콜라겐 랩핑 마스크 27건(상위 20위 9건) &lt; 모공·제로패드 17건(노출 1위)</li>
             </ul>
             <p class="why">영국에선 고가 디바이스보다 블랙헤드처럼 눈에 보이는 고민을 바로 해결하는 소모품이 진입 상품으로 맞는 것으로 보임</p>
           </li>
@@ -368,8 +367,6 @@
           <ul class="kpi">
             <li>Amazon.co.uk 모공 마스크·콜라겐 마스크 판매 순위와 리뷰 수 증가</li>
             <li>크리에이터 소재 30일 생존율(현재 57%)</li>
-            <li>마스크 구매자 중 90일 안에 부스터 프로를 산 비율</li>
-            <li>현지화 소재와 스페인어 소재의 CTR·장바구니 담기 비교</li>
           </ul>
         </div>
       </div>
@@ -380,8 +377,6 @@
           <tbody>
             <tr><td>블랙헤드 머드마스크 "Pore wash day"</td><td>코 클로즈업 비포 → 바르고 씻어내는 장면 → 애프터, 주간 루틴처럼 반복 연재</td><td>영국 노출 1위, 모공 소재 30일+ 82%</td><td><a href="https://www.facebook.com/ads/library/?id=1748883259467665" target="_blank" rel="noopener">1위 소재 ↗</a></td></tr>
             <tr><td>콜라겐 랩핑 마스크 오버나이트</td><td>밤에 바르고 아침에 벗기는 장면, "아침 광채" 결과 강조</td><td>27건 중앙값 73일, 상위 20위 9건</td><td><a href="https://www.facebook.com/ads/library/?id=1729053728309212" target="_blank" rel="noopener">110일·8위 ↗</a></td></tr>
-            <tr><td>아이패치 나이트 루틴</td><td>"이건 꼭 있어야 하는" 루틴 아이템 소개 형식, 영국 영어 크리에이터로 현지화</td><td>스페인어 원본 2·3위, 167일</td><td><a href="https://www.facebook.com/ads/library/?id=793858630478245" target="_blank" rel="noopener">167일·2위 ↗</a></td></tr>
-            <tr><td>PDRN 핑크 아이크림 듀오</td><td>눈가 주름·다크서클 고민을 짚고 아이크림 두 개를 함께 쓰는 법</td><td>66일째 영국 5위</td><td><a href="https://www.facebook.com/ads/library/?id=1736715214253801" target="_blank" rel="noopener">5위 소재 ↗</a></td></tr>
           </tbody>
         </table></div>
       </div>
@@ -390,16 +385,10 @@
     <!-- 프랑스 -->
     <div class="ins" data-ins="FR" hidden>
       <div class="card">
-        <span class="label">인사이트 · 프랑스 (소재 68건)</span>
-        <p class="one">프랑스는 Amazon.fr 블랙프라이데이 물량이 막 들어가 소재 대부분이 머신러닝 학습중인 것으로 추정</p>
+        <span class="label">인사이트 · 프랑스 (메디큐브 소재 68건)</span>
+        <p class="one">프랑스는 블랙프라이데이 할인 등 전환용 주제보다 "왜 이게 효과가 있는지" 설명하고 의심을 풀어주는 페인포인트 해소, 도달용 주제가 아직 유의미함</p>
         <ol>
-          <li><b>소재 대부분이 켜진 지 일주일 미만</b>
-            <ul>
-              <li>68건 운영일수 중앙값 4일, 30일+ 19%(미국 55%, 영국 56%)</li>
-              <li>63건(93%)이 Amazon.fr 랜딩, 문구에 "Disponible sur Amazon France", "Black Friday… profitez"가 반복</li>
-            </ul>
-            <p class="why">프랑스는 Amazon.fr 판매 확대와 블프를 같이 밀고 있는 런칭 구간으로 보임</p>
-          </li>
+          <li><b>Amazon.fr 블랙프라이데이 관련 소재 대부분이 켜진 지 7일 미만, 머신러닝 학습중인 것으로 추정</b></li>
           <li><b>상위권은 전부 크리에이터, 브랜드 자체 소재는 상위 20위 0건</b>
             <ul>
               <li>노출 상위 20위 20건이 모두 파트너십 광고</li>
@@ -409,16 +398,8 @@
           </li>
           <li><b>유의미한 소재는 '루틴'과 '통념 깨기' 주제의 크리에이터 영상</b>
             <ul>
-              <li>루틴·사용법 문구 9건: 프랑스 노출 순위 중앙값 12위, 30일+ 44%</li>
-              <li>"PEAUX MORTES ? La vérité sur cet exfoliant", "On arrête de vous mentir sur la skincare" 같은 통념 깨기 영상이 상위 10위 안에 2건</li>
+              <li>루틴·사용법 문구 9건: 프랑스 노출 순위 중앙값 12위</li>
               <li>바디 필 샷 영상이 158일째 프랑스 2위, 바디케어 비중(11건)이 미국(7건)·영국(3건)보다 높음</li>
-            </ul>
-          </li>
-          <li><b>블랙프라이데이 할인 주제보다 "왜 이게 효과가 있는지" 설명하고 의심을 풀어주는 페인포인트 해소 주제가 아직 유의미함</b>
-            <ul>
-              <li>세일·블랙프라이데이 문구 19건: 프랑스 노출 순위 중앙값 42위, 30일+ 0%</li>
-              <li>루틴·사용법 문구 9건: 중앙값 12위, 30일+ 44% → 같은 시기에 켠 소재 중 설명형이 세일형보다 노출 순위 30계단 위</li>
-              <li>브랜드 자체 소재 17건은 30일+ 0%, 상위 20위 0건</li>
             </ul>
             <p class="why">프랑스 시장은 진입 초기 단계이기 때문에 소비자들의 의구심을 해소하는 주제가 더 많이 필요함. 이에 따라 다양한 크리에이터 섭외가 1순위</p>
           </li>
@@ -439,7 +420,6 @@
             <li>Amazon.fr 상품별 리뷰 수 증가와 판매 순위</li>
             <li>크리에이터 소재 14일 생존율(지금은 중앙값 4일)</li>
             <li>루틴·통념 깨기형 vs 세일형 소재의 CTR·장바구니 담기</li>
-            <li>바디 필 샷 Amazon.fr 판매 순위와 재구매율</li>
           </ul>
         </div>
       </div>
@@ -450,8 +430,6 @@
           <tbody>
             <tr><td>PDRN 3단계 루틴</td><td>"세 단계로 피부가 이렇게 됐다" 순서대로 보여주는 루틴 영상</td><td>프랑스 노출 1위</td><td><a href="https://www.facebook.com/ads/library/?id=2186689405224573" target="_blank" rel="noopener">1위 소재 ↗</a></td></tr>
             <tr><td>통념 깨기 · 진실 공개</td><td>"각질 제거제의 진실", "스킨케어에 대한 거짓말" 식 질문 훅 → 성분 설명 → 결과</td><td>상위 10위 안 2건</td><td><a href="https://www.facebook.com/ads/library/?id=2309408059923492" target="_blank" rel="noopener">6위 소재 ↗</a></td></tr>
-            <tr><td>바디 필 샷</td><td>화장솜이 갈색으로 변하는 순간을 클로즈업, 바디 각질 고민</td><td>158일째 2위</td><td><a href="https://www.facebook.com/ads/library/?id=4084290361707056" target="_blank" rel="noopener">158일·2위 ↗</a></td></tr>
-            <tr><td>메이크업 전 프렙 스킨</td><td>"다들 프렙을 얕본다" 공감 훅 → 글래스 스킨 준비 루틴</td><td>159일째 9위</td><td><a href="https://www.facebook.com/ads/library/?id=990894530196673" target="_blank" rel="noopener">159일·9위 ↗</a></td></tr>
           </tbody>
         </table></div>
       </div>
